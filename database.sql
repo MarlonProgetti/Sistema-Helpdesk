@@ -14,6 +14,7 @@ CREATE TABLE chamados (
     descricao TEXT NOT NULL,
     categoria VARCHAR(50) NOT NULL,
     status VARCHAR(30) DEFAULT 'Aberto',
+    data_resolucao TEXT,
     data_abertura DATETIME DEFAULT CURRENT_TIMESTAMP,
     usuario_id INT,
     FOREIGN KEY (usuario_id) REFERENCES usuarios(id)

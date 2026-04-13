@@ -51,6 +51,28 @@ def abrir_chamado():
     
     return jsonify({"mensagem": "Chamado aberto com sucesso!"}), 201
 
+@app.route('/api/chamados/<int:id>', methods=['PUT'])
+def atualizar_chamado(id):
+    dados = request.json # Pega os dados que o técnico digitou no Front-end
+    
+    novo_status = dados.get('status')
+    nota_resolucao = dados.get('nota_resolucao')
+    
+    conexao = conectar_banco()
+    cursor = conexao.cursor()
+    
+    # Atualiza o chamado específico no banco de dados
+    sql = "UPDATE chamados SET status = %s, nota_resolucao = %s WHERE id = %s"
+    valores = (novo_status, nota_resolucao, id)
+    
+    cursor.execute(sql, valores)
+    conexao.commit() # Salva as alterações
+    
+    cursor.close()
+    conexao.close()
+    
+    return jsonify({"mensagem": "Chamado atualizado com sucesso!"}), 200
+
 # Inicia o servidor
 if __name__ == '__main__':
     app.run(debug=True, port=5000)
