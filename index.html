@@ -20,6 +20,7 @@
     <h2 class="mb-4 text-white">M-Desk | Gestão de Chamados</h2>
 
     <div class="row">
+      <!-- Lado Esquerdo: Formulário de Abertura -->
       <div class="col-md-4 mb-4">
         <div class="card shadow-sm">
           <div class="card-header bg-white">
@@ -51,6 +52,7 @@
         </div>
       </div>
 
+      <!-- Lado Direito: Tabela de Chamados -->
       <div class="col-md-8">
         <div class="card shadow-sm">
           <div class="card-header bg-white d-flex justify-content-between align-items-center">
@@ -64,10 +66,11 @@
                   <th>ID</th>
                   <th>Título</th>
                   <th>Status</th>
-                  <th>Ação</th>
+                  <th>Ações</th>
                 </tr>
               </thead>
               <tbody id="tabela-chamados">
+                <!-- O JavaScript vai injetar as linhas aqui -->
               </tbody>
             </table>
           </div>
@@ -76,6 +79,9 @@
     </div>
   </div>
 
+  <!-- ========================================== -->
+  <!-- MODAL DE ATENDIMENTO                       -->
+  <!-- ========================================== -->
   <div class="modal fade" id="modalAtendimento" tabindex="-1">
     <div class="modal-dialog">
       <div class="modal-content">
@@ -86,6 +92,7 @@
         <div class="modal-body">
           <form id="form-atendimento">
             <input type="hidden" id="modal-id-chamado">
+
             <div class="mb-3">
               <label class="form-label">Novo Status</label>
               <select id="modal-status" class="form-select" required>
@@ -119,10 +126,16 @@
         tbody.innerHTML = '';
 
         chamados.forEach(chamado => {
-          // Define a cor do badge baseado no status
           let corStatus = 'bg-warning';
           if (chamado.status === 'Resolvido') corStatus = 'bg-success';
           if (chamado.status === 'Aberto') corStatus = 'bg-danger';
+
+          // Regra do Botão de Excluir: Só aparece se o status for "Aberto"
+          // Regra do Botão de Excluir: Aparece para todos, exceto "Resolvido"
+          let botaoExcluir = '';
+          if (chamado.status !== 'Resolvido') {
+            botaoExcluir = `<button class="btn btn-sm btn-outline-danger ms-1" onclick="excluirChamado(${chamado.id})">Excluir</button>`;
+          }
 
           const tr = document.createElement('tr');
           tr.innerHTML = `
@@ -134,6 +147,7 @@
                     <td><span class="badge ${corStatus}">${chamado.status}</span></td>
                     <td>
                         <button class="btn btn-sm btn-primary" onclick="abrirModal(${chamado.id})">Atender</button>
+                        ${botaoExcluir}
                     </td>
                 `;
           tbody.appendChild(tr);
@@ -165,32 +179,45 @@
 
     // 3. ABRIR O MODAL DO TÉCNICO
     function abrirModal(id) {
-      document.getElementById('modal-id-chamado').value = id; // Guarda o ID no campo oculto
-      document.getElementById('modal-id-display').innerText = id; // Mostra o ID no título
-      document.getElementById('modal-nota').value = ''; // Limpa a caixa de texto
-      modalBootstrap.show(); // Faz o modal pular na tela
+      document.getElementById('modal-id-chamado').value = id;
+      document.getElementById('modal-id-display').innerText = id;
+      document.getElementById('modal-nota').value = '';
+      modalBootstrap.show();
     }
 
     // 4. SALVAR O ATENDIMENTO (PUT)
     document.getElementById('form-atendimento').addEventListener('submit', async function (e) {
       e.preventDefault();
-
       const id = document.getElementById('modal-id-chamado').value;
       const dadosAtualizacao = {
         status: document.getElementById('modal-status').value,
         nota_resolucao: document.getElementById('modal-nota').value
       };
-
       try {
         await fetch(`${API_URL}/${id}`, {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(dadosAtualizacao)
         });
-        modalBootstrap.hide(); // Esconde o modal
-        carregarChamados(); // Atualiza a tabela pra ver a mudança de cor!
+        modalBootstrap.hide();
+        carregarChamados();
       } catch (error) { console.error(error); }
     });
+
+    // 5. EXCLUIR CHAMADO (DELETE) - NOVA FUNÇÃO!
+    async function excluirChamado(id) {
+      // Confirmação de segurança para o usuário não excluir sem querer
+      if (confirm(`Atenção: Tem certeza que deseja excluir o chamado #${id}? Esta ação não pode ser desfeita.`)) {
+        try {
+          await fetch(`${API_URL}/${id}`, {
+            method: 'DELETE'
+          });
+          carregarChamados(); // Atualiza a tabela na mesma hora
+        } catch (error) {
+          console.error('Erro ao excluir:', error);
+        }
+      }
+    }
 
     // Inicia a tabela ao abrir
     carregarChamados();

@@ -73,6 +73,24 @@ def atualizar_chamado(id):
     
     return jsonify({"mensagem": "Chamado atualizado com sucesso!"}), 200
 
+# ROTA 4: Excluir um chamado (DELETE)
+@app.route('/api/chamados/<int:id>', methods=['DELETE'])
+def excluir_chamado(id):
+    conexao = conectar_banco()
+    cursor = conexao.cursor()
+    
+    # Comando SQL para apagar a linha da tabela
+    sql = "DELETE FROM chamados WHERE id = %s"
+    valores = (id,) # Essa vírgula é obrigatória no Python quando temos apenas 1 valor
+    
+    cursor.execute(sql, valores)
+    conexao.commit() # Salva as alterações no banco
+    
+    cursor.close()
+    conexao.close()
+    
+    return jsonify({"mensagem": "Chamado excluído com sucesso!"}), 200
+
 # Inicia o servidor
 if __name__ == '__main__':
     app.run(debug=True, port=5000)
