@@ -91,6 +91,36 @@ def excluir_chamado(id):
     
     return jsonify({"mensagem": "Chamado excluído com sucesso!"}), 200
 
+# ROTA 5: Autenticação de Usuários (LOGIN)
+@app.route('/api/login', methods=['POST'])
+def login():
+    dados = request.json
+    email = dados.get('email')
+    senha = dados.get('senha')
+    
+    # Imprime no terminal o que chegou do Front-end
+    print(f"\n--- TENTATIVA DE LOGIN ---")
+    print(f"E-mail digitado: '{email}'")
+    print(f"Senha digitada: '{senha}'")
+    
+    conexao = conectar_banco()
+    cursor = conexao.cursor(dictionary=True)
+    
+    sql = "SELECT id, nome, perfil FROM usuarios WHERE email = %s AND senha = %s"
+    cursor.execute(sql, (email, senha))
+    usuario = cursor.fetchone()
+    
+    # Imprime o que o banco de dados respondeu
+    print(f"Resultado do Banco: {usuario}\n--------------------------\n")
+    
+    cursor.close()
+    conexao.close()
+    
+    if usuario:
+        return jsonify(usuario), 200
+    else:
+        return jsonify({"mensagem": "E-mail ou senha incorretos!"}), 401
+
 # Inicia o servidor
 if __name__ == '__main__':
     app.run(debug=True, port=5000)
