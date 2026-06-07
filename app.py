@@ -13,19 +13,28 @@ def conectar_banco():
         database="helpdesk_tcc"
     )
 
+# ROTA 2: Listar todos os chamados (READ / GET)
 @app.route('/api/chamados', methods=['GET'])
 def listar_chamados():
     conexao = conectar_banco()
     cursor = conexao.cursor(dictionary=True)
     
-    # Busca os chamados no banco
-    cursor.execute("SELECT * FROM chamados ORDER BY data_abertura DESC")
-    meus_chamados = cursor.fetchall()
+    # O comando JOIN une a tabela de chamados (c) com a de usuarios (u)
+    # usando o ID para descobrir o nome de quem abriu o chamado.
+    sql = """
+        SELECT c.*, u.nome AS nome_solicitante 
+        FROM chamados c 
+        JOIN usuarios u ON c.usuario_id = u.id 
+        ORDER BY c.id DESC
+    """
+    
+    cursor.execute(sql)
+    chamados = cursor.fetchall()
     
     cursor.close()
     conexao.close()
     
-    return jsonify(meus_chamados)
+    return jsonify(chamados), 200   
 
 @app.route('/api/chamados', methods=['POST'])
 def abrir_chamado():
