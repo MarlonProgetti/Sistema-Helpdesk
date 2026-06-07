@@ -121,6 +121,29 @@ def login():
     else:
         return jsonify({"mensagem": "E-mail ou senha incorretos!"}), 401
 
+# ROTA 6: Dados para o Dashboard Gerencial (GET)
+@app.route('/api/dashboard', methods=['GET'])
+def obter_dashboard():
+    conexao = conectar_banco()
+    cursor = conexao.cursor(dictionary=True)
+    
+    # Conta os chamados agrupados por Status
+    cursor.execute("SELECT status, COUNT(*) as total FROM chamados GROUP BY status")
+    dados_status = cursor.fetchall()
+    
+    # Conta os chamados agrupados por Categoria
+    cursor.execute("SELECT categoria, COUNT(*) as total FROM chamados GROUP BY categoria")
+    dados_categoria = cursor.fetchall()
+    
+    cursor.close()
+    conexao.close()
+    
+    # Devolve um pacote pronto para o JavaScript desenhar os gráficos
+    return jsonify({
+        "status": dados_status,
+        "categoria": dados_categoria
+    }), 200
+
 # Inicia o servidor
 if __name__ == '__main__':
     app.run(debug=True, port=5000)

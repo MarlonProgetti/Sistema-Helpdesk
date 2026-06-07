@@ -6,6 +6,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>M-Desk | Gestão de Chamados</title>
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   <style>
     body {
       background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
@@ -14,6 +15,12 @@
 
     .d-none {
       display: none !important;
+    }
+
+    .chart-container {
+      position: relative;
+      height: 250px;
+      width: 100%;
     }
   </style>
 </head>
@@ -30,13 +37,13 @@
             <form id="form-login">
               <div class="mb-3">
                 <label class="form-label">E-mail</label>
-                <input type="email" id="login-email" class="form-control" required placeholder="Ex: operador@teste.com">
+                <input type="email" id="login-email" class="form-control" required>
               </div>
               <div class="mb-4">
                 <label class="form-label">Senha</label>
-                <input type="password" id="login-senha" class="form-control" required placeholder="***">
+                <input type="password" id="login-senha" class="form-control" required>
               </div>
-              <button type="submit" class="btn btn-primary w-100 py-2fw-bold">Entrar no Sistema</button>
+              <button type="submit" class="btn btn-primary w-100 py-2 fw-bold">Entrar no Sistema</button>
             </form>
           </div>
         </div>
@@ -44,10 +51,37 @@
     </div>
   </div>
 
-  <div id="tela-sistema" class="container mt-5 d-none">
+  <div id="tela-sistema" class="container mt-4 d-none">
     <div class="d-flex justify-content-between align-items-center mb-4">
       <h2 class="text-white mb-0">M-Desk | <span id="txt-nome-perfil" class="fs-4 fw-light"></span></h2>
       <button class="btn btn-light btn-sm fw-bold px-3 text-danger" onclick="logout()">Sair</button>
+    </div>
+
+    <div id="container-dashboard" class="row mb-4 d-none">
+      <div class="col-md-5">
+        <div class="card shadow-sm border-0 h-100">
+          <div class="card-header bg-white text-center fw-bold text-secondary">
+            Status dos Chamados
+          </div>
+          <div class="card-body">
+            <div class="chart-container">
+              <canvas id="graficoStatus"></canvas>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="col-md-7">
+        <div class="card shadow-sm border-0 h-100">
+          <div class="card-header bg-white text-center fw-bold text-secondary">
+            Volume por Categoria
+          </div>
+          <div class="card-body">
+            <div class="chart-container">
+              <canvas id="graficoCategoria"></canvas>
+            </div>
+          </div>
+        </div>
+      </div>
     </div>
 
     <div class="row">
@@ -67,9 +101,9 @@
                 <select id="categoria" class="form-select" required>
                   <option value="">Selecione...</option>
                   <option value="Frente de Caixa/PDV">Frente de Caixa/PDV</option>
-                  <option value="Impressoras">Impressoras (Spooler/Drivers)</option>
-                  <option value="Infraestrutura/Rede">Infraestrutura e Rede</option>
-                  <option value="Hardware">Hardware (Desktop/TV Box)</option>
+                  <option value="Impressoras">Impressoras</option>
+                  <option value="Infraestrutura/Rede">Infraestrutura/Rede</option>
+                  <option value="Hardware">Hardware</option>
                 </select>
               </div>
               <div class="mb-3">
@@ -86,20 +120,19 @@
         <div class="card shadow-sm border-0">
           <div class="card-header bg-white d-flex justify-content-between align-items-center">
             <h5 class="card-title mb-0 text-secondary fw-bold">Painel de Monitoramento</h5>
-            <button class="btn btn-sm btn-outline-secondary" onclick="carregarChamados()">Atualizar</button>
+            <button class="btn btn-sm btn-outline-secondary" onclick="carregarDados()">Atualizar</button>
           </div>
           <div class="card-body p-0">
             <table class="table table-hover mb-0">
               <thead class="table-light">
                 <tr>
                   <th>ID</th>
-                  <th>Título</th>
+                  <th>Detalhes do Chamado</th>
                   <th>Status</th>
                   <th id="th-acoes">Ações</th>
                 </tr>
               </thead>
-              <tbody id="tabela-chamados">
-              </tbody>
+              <tbody id="tabela-chamados"></tbody>
             </table>
           </div>
         </div>
@@ -111,7 +144,7 @@
     <div class="modal-dialog">
       <div class="modal-content">
         <div class="modal-header">
-          <h5 class="modal-title">Atender Chamado #<span id="modal-id-display"></span></h5>
+          <h5 class="modal-title">Atender #<span id="modal-id-display"></span></h5>
           <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
         </div>
         <div class="modal-body">
@@ -126,10 +159,10 @@
               </select>
             </div>
             <div class="mb-3">
-              <label class="form-label">Nota de Resolução do Técnico</label>
-              <textarea id="modal-nota" class="form-control" rows="4" placeholder="Descreva o que foi feito..." required></textarea>
+              <label class="form-label">Nota de Resolução</label>
+              <textarea id="modal-nota" class="form-control" rows="4" required></textarea>
             </div>
-            <button type="submit" class="btn btn-success w-100">Salvar Atendimento</button>
+            <button type="submit" class="btn btn-success w-100">Salvar</button>
           </form>
         </div>
       </div>
@@ -141,11 +174,12 @@
     const API_URL = 'http://localhost:5000/api';
     const modalBootstrap = new bootstrap.Modal(document.getElementById('modalAtendimento'));
 
-    // Variáveis globais para guardar quem está logado
     let usuarioLogadoId = null;
     let usuarioLogadoPerfil = null;
+    let chartStatusInstancia = null;
+    let chartCategoriaInstancia = null;
 
-    // 1. EVENTO DE LOGIN
+    // LOGIN
     document.getElementById('form-login').addEventListener('submit', async function (e) {
       e.preventDefault();
       const email = document.getElementById('login-email').value;
@@ -163,40 +197,45 @@
           usuarioLogadoId = user.id;
           usuarioLogadoPerfil = user.perfil;
 
-          // Transiciona as telas
           document.getElementById('tela-login').classList.add('d-none');
           document.getElementById('tela-sistema').classList.remove('d-none');
           document.getElementById('txt-nome-perfil').innerText = `${user.nome} (${user.perfil.toUpperCase()})`;
 
           configurarLayoutPorPerfil();
-          carregarChamados();
-        } else {
-          alert('E-mail ou senha inválidos!');
-        }
-      } catch (error) {
-        alert('Erro ao tentar conectar com o servidor.');
-      }
+          carregarDados();
+        } else { alert('E-mail ou senha inválidos!'); }
+      } catch (error) { alert('Erro de conexão.'); }
     });
 
-    // 2. CONFIGURAR INTERFACE BASEADO NO PERFIL
+    // LAYOUT E PERMISSÕES
     function configurarLayoutPorPerfil() {
       const formCol = document.getElementById('container-formulario');
       const tabelaCol = document.getElementById('container-tabela');
+      const dashboard = document.getElementById('container-dashboard');
       const thAcoes = document.getElementById('th-acoes');
 
       if (usuarioLogadoPerfil === 'operador') {
-        formCol.classList.add('d-none'); // Esconde o formulário
-        tabelaCol.className = "col-md-12"; // Expande a tabela para ocupar a tela toda
+        formCol.classList.add('d-none');
+        tabelaCol.className = "col-md-12";
+        dashboard.classList.remove('d-none'); // Mostra os gráficos para o gerente/operador
         thAcoes.classList.remove('d-none');
       } else {
-        // Se for Solicitante
         formCol.classList.remove('d-none');
         tabelaCol.className = "col-md-8";
-        thAcoes.classList.add('d-none'); // Esconde a coluna inteira de ações na tabela
+        dashboard.classList.add('d-none'); // Esconde do cliente
+        thAcoes.classList.add('d-none');
       }
     }
 
-    // 3. CARREGAR CHAMADOS (GET)
+    // CARREGAR TUDO (Tabela e Dashboard)
+    async function carregarDados() {
+      carregarChamados();
+      if (usuarioLogadoPerfil === 'operador') {
+        carregarDashboard();
+      }
+    }
+
+    // TABELA DE CHAMADOS
     async function carregarChamados() {
       try {
         const response = await fetch(`${API_URL}/chamados`);
@@ -209,31 +248,16 @@
           if (chamado.status === 'Resolvido') corStatus = 'bg-success';
           if (chamado.status === 'Aberto') corStatus = 'bg-danger';
 
-          // Monta os botões apenas se for operador
           let botoesAcao = '';
           if (usuarioLogadoPerfil === 'operador') {
-            let botaoExcluir = '';
-            if (chamado.status !== 'Resolvido') {
-              botaoExcluir = `<button class="btn btn-sm btn-outline-danger ms-1" onclick="excluirChamado(${chamado.id})">Excluir</button>`;
-            }
-            botoesAcao = `
-                        <td>
-                            <button class="btn btn-sm btn-primary" onclick="abrirModal(${chamado.id})">Atender</button>
-                            ${botaoExcluir}
-                        </td>`;
+            let btnExcluir = chamado.status !== 'Resolvido' ? `<button class="btn btn-sm btn-outline-danger ms-1" onclick="excluirChamado(${chamado.id})">Excluir</button>` : '';
+            botoesAcao = `<td><button class="btn btn-sm btn-primary" onclick="abrirModal(${chamado.id})">Atender</button>${btnExcluir}</td>`;
           } else {
             botoesAcao = `<td class="d-none"></td>`;
           }
 
-          // Verifica se o técnico escreveu alguma nota. Se sim, cria uma caixa de aviso estilizada.
-          let notaDoTecnico = '';
-          if (chamado.nota_resolucao && chamado.nota_resolucao.trim() !== '') {
-            notaDoTecnico = `
-                        <div class="mt-2 p-2 text-dark bg-light rounded" style="font-size: 0.85em; border-left: 4px solid #0d6efd;">
-                            <strong>👨‍🔧 Resposta do Suporte:</strong> ${chamado.nota_resolucao}
-                        </div>
-                    `;
-          }
+          let notaDoTecnico = chamado.nota_resolucao && chamado.nota_resolucao.trim() !== ''
+            ? `<div class="mt-2 p-2 text-dark bg-light rounded" style="font-size: 0.85em; border-left: 4px solid #0d6efd;"><strong>👨‍🔧 Resposta:</strong> ${chamado.nota_resolucao}</div>` : '';
 
           const tr = document.createElement('tr');
           tr.innerHTML = `
@@ -241,12 +265,9 @@
                     <td>
                         <strong>${chamado.titulo}</strong><br>
                         <small class="text-primary fw-bold">${chamado.categoria}</small>
-                        
-                        <div class="text-secondary mt-1" style="font-size: 0.9em;">
-                            <em>${chamado.descricao}</em>
-                        </div>
-                        
-                        ${notaDoTecnico} </td>
+                        <div class="text-secondary mt-1" style="font-size: 0.9em;"><em>${chamado.descricao}</em></div>
+                        ${notaDoTecnico}
+                    </td>
                     <td><span class="badge ${corStatus}">${chamado.status}</span></td>
                     ${botoesAcao}
                 `;
@@ -255,73 +276,104 @@
       } catch (error) { console.error('Erro:', error); }
     }
 
-    // 4. ABRIR NOVO CHAMADO (POST)
+    // RENDERIZAR GRÁFICOS DO DASHBOARD
+    async function carregarDashboard() {
+      try {
+        const response = await fetch(`${API_URL}/dashboard`);
+        const dados = await response.json();
+
+        // Monta os dados para o Gráfico de Status (Pizza/Rosca)
+        const labelsStatus = dados.status.map(item => item.status);
+        const valoresStatus = dados.status.map(item => item.total);
+
+        // Monta os dados para o Gráfico de Categoria (Barras)
+        const labelsCategoria = dados.categoria.map(item => item.categoria);
+        const valoresCategoria = dados.categoria.map(item => item.total);
+
+        // Destrói os gráficos antigos antes de desenhar os novos para não sobrepor
+        if (chartStatusInstancia) chartStatusInstancia.destroy();
+        if (chartCategoriaInstancia) chartCategoriaInstancia.destroy();
+
+        // Cria uma regra de cores fixa para cada tipo de status
+        const coresStatus = labelsStatus.map(status => {
+          if (status === 'Aberto') return '#dc3545';           // Vermelho (Perigo)
+          if (status === 'Resolvido') return '#198754';        // Verde (Sucesso)
+          if (status === 'Em Atendimento') return '#0d6efd';   // Azul (Ação)
+          if (status === 'Aguardando Peça') return '#ffc107';  // Amarelo (Aviso)
+          return '#6c757d';                                    // Cinza (Padrão)
+        });
+
+        // Desenha Gráfico de Status com as cores dinâmicas
+        const ctxStatus = document.getElementById('graficoStatus').getContext('2d');
+        chartStatusInstancia = new Chart(ctxStatus, {
+          type: 'doughnut',
+          data: {
+            labels: labelsStatus,
+            datasets: [{
+              data: valoresStatus,
+              backgroundColor: coresStatus // <- Puxa as cores inteligentes aqui
+            }]
+          },
+          options: { maintainAspectRatio: false, plugins: { legend: { position: 'right' } } }
+        });
+        // Desenha Gráfico de Categoria
+        const ctxCategoria = document.getElementById('graficoCategoria').getContext('2d');
+        chartCategoriaInstancia = new Chart(ctxCategoria, {
+          type: 'bar',
+          data: {
+            labels: labelsCategoria,
+            datasets: [{
+              label: 'Total de Chamados',
+              data: valoresCategoria,
+              backgroundColor: '#667eea'
+            }]
+          },
+          options: { maintainAspectRatio: false, plugins: { legend: { display: false } } }
+        });
+
+      } catch (error) { console.error('Erro no dashboard:', error); }
+    }
+
+    // AÇÕES DE CRUD (Restante igual)
     document.getElementById('form-chamado').addEventListener('submit', async function (e) {
       e.preventDefault();
-      const dados = {
-        titulo: document.getElementById('titulo').value,
-        categoria: document.getElementById('categoria').value,
-        descricao: document.getElementById('descricao').value,
-        usuario_id: usuarioLogadoId // Associa o chamado dinamicamente ao ID de quem logou!
-      };
-      try {
-        await fetch(`${API_URL}/chamados`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(dados)
-        });
-        document.getElementById('form-chamado').reset();
-        carregarChamados();
-      } catch (error) { console.error(error); }
+      const dados = { titulo: document.getElementById('titulo').value, categoria: document.getElementById('categoria').value, descricao: document.getElementById('descricao').value, usuario_id: usuarioLogadoId };
+      await fetch(`${API_URL}/chamados`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(dados) });
+      document.getElementById('form-chamado').reset();
+      carregarDados();
     });
 
-    // 5. ABRIR O MODAL DO TÉCNICO
     function abrirModal(id) {
       document.getElementById('modal-id-chamado').value = id;
-      document.getElementById('modal-id-display').innerText = id;
       document.getElementById('modal-nota').value = '';
       modalBootstrap.show();
     }
 
-    // 6. SALVAR O ATENDIMENTO (PUT)
     document.getElementById('form-atendimento').addEventListener('submit', async function (e) {
       e.preventDefault();
       const id = document.getElementById('modal-id-chamado').value;
-      const dadosAtualizacao = {
-        status: document.getElementById('modal-status').value,
-        nota_resolucao: document.getElementById('modal-nota').value
-      };
-      try {
-        await fetch(`${API_URL}/chamados/${id}`, {
-          method: 'PUT',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(dadosAtualizacao)
-        });
-        modalBootstrap.hide();
-        carregarChamados();
-      } catch (error) { console.error(error); }
+      const dadosAtualizacao = { status: document.getElementById('modal-status').value, nota_resolucao: document.getElementById('modal-nota').value };
+      await fetch(`${API_URL}/chamados/${id}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(dadosAtualizacao) });
+      modalBootstrap.hide();
+      carregarDados();
     });
 
-    // 7. EXCLUIR CHAMADO (DELETE)
     async function excluirChamado(id) {
-      if (confirm(`Tem certeza que deseja excluir o chamado #${id}?`)) {
-        try {
-          await fetch(`${API_URL}/chamados/${id}`, { method: 'DELETE' });
-          carregarChamados();
-        } catch (error) { console.error(error); }
+      if (confirm(`Excluir chamado #${id}?`)) {
+        await fetch(`${API_URL}/chamados/${id}`, { method: 'DELETE' });
+        carregarDados();
       }
     }
 
-    // 8. LOGOUT (SAIR)
     function logout() {
-      usuarioLogadoId = null;
-      usuarioLogadoPerfil = null;
+      usuarioLogadoId = null; usuarioLogadoPerfil = null;
       document.getElementById('form-login').reset();
       document.getElementById('tela-sistema').classList.add('d-none');
       document.getElementById('tela-login').classList.remove('d-none');
+      if (chartStatusInstancia) chartStatusInstancia.destroy();
+      if (chartCategoriaInstancia) chartCategoriaInstancia.destroy();
     }
   </script>
-
 </body>
 
 </html>
